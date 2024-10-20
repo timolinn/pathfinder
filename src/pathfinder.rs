@@ -138,7 +138,6 @@ impl Pathfinder {
     }
 
     fn calculate_fscore(&self, node: &Node) -> f64 {
-        // TODO add error handling
         node.g_score + self.heuristic_cost_estimate(node.node)
     }
 }

@@ -14,7 +14,7 @@ pub struct Pathfinder {
     goal: u8,
     explored_set: HashSet<u8>,
     frontier_heap: BinaryHeap<Reverse<FrontierNode>>,
-    frontier_set: HashSet<u8>,
+    frontier_set: HashSet<(u8, u8)>,
 }
 
 impl Pathfinder {
@@ -27,14 +27,15 @@ impl Pathfinder {
             );
         }
 
-        let mut start_node = FrontierNode(0.0, nodes.get(&start).cloned().unwrap());
+        let mut start_node = FrontierNode(0, 0.0, nodes.get(&start).cloned().unwrap());
+        start_node.2.g_score = 0.0;
         Self {
             map: nodes,
             start,
             goal,
             explored_set: HashSet::new(),
             frontier_heap: BinaryHeap::from([Reverse(start_node)]),
-            frontier_set: HashSet::from([start]),
+            frontier_set: HashSet::from([(start, start)]),
         }
     }
 
@@ -51,53 +52,52 @@ impl Pathfinder {
     pub fn run_search(&mut self) -> Option<Vec<u8>> {
         while self.frontier_set.len() > 0 {
             let mut current_node = self.frontier_heap.pop().unwrap().0;
-            println!(
-                "current => {}, f_score => {}",
-                current_node.1.node, current_node.1.f_score
-            );
-            if current_node.1.node == self.goal {
-                current_node.1.actions.reverse();
-                current_node.1.actions.push(self.goal);
-                return Some(current_node.1.actions);
+
+            if current_node.2.node == self.goal {
+                current_node.2.actions.reverse();
+                current_node.2.actions.push(self.goal);
+                return Some(current_node.2.actions);
             } else {
-                self.explored_set.insert(current_node.1.node);
-                self.frontier_set.remove(&current_node.1.node);
+                self.explored_set.insert(current_node.2.node);
+                self.frontier_set
+                    .remove(&(current_node.0, current_node.2.node));
             }
 
-            println!("================================CONNECTIONS===========================");
-            for conn in current_node.1.connections {
+            for conn in current_node.2.connections {
                 if self.explored_set.contains(&conn) {
                     // node already explored, skip
                     continue;
                 }
 
-                if !self.frontier_set.contains(&conn) {
+                if !self.frontier_set.contains(&(current_node.2.node, conn)) {
                     // new path discovered
                     // update frontier with new paths
-                    let mut came_from = vec![current_node.1.node];
-                    came_from.extend(current_node.1.actions.iter());
-                    self.update_frontier(current_node.1.node, conn, came_from);
+                    let mut came_from = vec![current_node.2.node];
+                    came_from.extend(current_node.2.actions.iter());
+                    self.update_frontier(
+                        current_node.2.node,
+                        conn,
+                        came_from,
+                        current_node.2.g_score,
+                    );
                 }
             }
-            println!("================================END===========================");
         }
         println!("no path found!");
         None
     }
 
-    fn update_frontier(&mut self, current: u8, neighbor: u8, mut came_from: Vec<u8>) {
+    fn update_frontier(&mut self, current: u8, neighbor: u8, mut came_from: Vec<u8>, g_score: f64) {
         let mut connection = self.map.get(&neighbor).cloned().unwrap();
         connection.actions.append(&mut came_from);
-        connection.f_score =
-            self.euclidean_distance(current, neighbor) + self.calculate_fscore(current, neighbor);
-        println!(
-            "f_Score => {}, node => {}",
-            connection.f_score, connection.node
-        );
-
-        self.frontier_set.insert(connection.node);
-        self.frontier_heap
-            .push(Reverse(FrontierNode(connection.f_score, connection)));
+        connection.g_score = g_score + self.euclidean_distance(current, neighbor);
+        connection.f_score = self.calculate_fscore(&connection);
+        self.frontier_set.insert((current, connection.node));
+        self.frontier_heap.push(Reverse(FrontierNode(
+            current,
+            connection.f_score,
+            connection,
+        )));
     }
 
     pub fn set_map(&mut self, m: Map) {
@@ -124,7 +124,7 @@ impl Pathfinder {
         // TODO add error handling
         let n = self.map.get(&node_1).unwrap();
         let n1 = self.map.get(&node_2).unwrap();
-        (n1.x() - n.x()).powf(2.0) + (n1.y() - n.y()).powf(2.0)
+        ((n1.x() - n.x()).powf(2.0) + (n1.y() - n.y()).powf(2.0)).sqrt()
     }
 
     // pub fn _manhattan_distance(&self, node_1: u8, node_2: u8) -> f64 {
@@ -137,8 +137,8 @@ impl Pathfinder {
         self.euclidean_distance(node, self.goal)
     }
 
-    fn calculate_fscore(&self, node_1: u8, node_2: u8) -> f64 {
+    fn calculate_fscore(&self, node: &Node) -> f64 {
         // TODO add error handling
-        self.euclidean_distance(node_1, node_2) + self.heuristic_cost_estimate(node_2)
+        node.g_score + self.heuristic_cost_estimate(node.node)
     }
 }

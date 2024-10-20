@@ -8,11 +8,12 @@ pub struct Node {
     pub pos: Position,
     pub connections: Vec<u8>,
     pub actions: Vec<u8>,
-    pub f_score: f64, // actual cost from src to goal node
+    pub f_score: f64, // cost from src to goal node
+    pub g_score: f64, // cost from src to neighbor node
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FrontierNode(pub f64, pub Node);
+pub struct FrontierNode(pub u8, pub f64, pub Node);
 
 impl Node {
     pub fn new(node: u8, pos: Position, connections: Vec<u8>) -> Self {
@@ -22,6 +23,7 @@ impl Node {
             connections,
             actions: vec![],
             f_score: f64::INFINITY,
+            g_score: f64::INFINITY,
         }
     }
 
@@ -63,8 +65,7 @@ impl Node {
 // we must implement proper comparison which uses f_score for node comparison
 impl PartialOrd for FrontierNode {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        println!("CMP=>{};{}", self.1.node, other.1.node);
-        match self.0 > other.0 {
+        match self.1 > other.1 {
             true => Some(Ordering::Greater),
             _ => Some(Ordering::Less),
         }
@@ -73,8 +74,7 @@ impl PartialOrd for FrontierNode {
 
 impl Ord for FrontierNode {
     fn cmp(&self, other: &Self) -> Ordering {
-        println!("CMP=>{};{}", self.1.node, other.1.node);
-        match self.0 > other.0 {
+        match self.1 > other.1 {
             true => Ordering::Greater,
             _ => Ordering::Less,
         }

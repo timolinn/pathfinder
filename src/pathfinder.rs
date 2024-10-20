@@ -1,29 +1,40 @@
-use std::collections::HashMap;
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, HashSet},
+};
 
-use crate::{helpers::Position, node::Node};
+use crate::{
+    helpers::Map,
+    node::{FrontierNode, Node},
+};
 
 pub struct Pathfinder {
     map: HashMap<u8, Node>,
-    src: u8,
-    dst: u8,
-    explored: Vec<Node>,
-    open_set: Vec<Node>,
+    start: u8,
+    goal: u8,
+    explored_set: HashSet<u8>,
+    frontier_heap: BinaryHeap<Reverse<FrontierNode>>,
+    frontier_set: HashSet<u8>,
 }
 
 impl Pathfinder {
-    pub fn _new(map: HashMap<u8, (Position, Vec<u8>)>, src: u8, dst: u8) -> Self {
+    pub fn new(map: Map, start: u8, goal: u8) -> Self {
         let mut nodes = HashMap::new();
-        for loc in map {
-            nodes.insert(loc.0, Node::new(loc.1 .0, loc.1 .1));
+        for loc in map.iter() {
+            nodes.insert(
+                *loc.0,
+                Node::new(*loc.0, loc.1 .0.clone(), loc.1 .1.clone()),
+            );
         }
 
-        let start = nodes.get(&src).cloned().unwrap();
+        let mut start_node = FrontierNode(0.0, nodes.get(&start).cloned().unwrap());
         Self {
             map: nodes,
-            src,
-            dst,
-            explored: vec![Node::new(start.pos, start.connections)],
-            open_set: vec![],
+            start,
+            goal,
+            explored_set: HashSet::new(),
+            frontier_heap: BinaryHeap::from([Reverse(start_node)]),
+            frontier_set: HashSet::from([start]),
         }
     }
 
@@ -37,7 +48,97 @@ impl Pathfinder {
     // add the best item to explored list
     // take best item again
     // repeat previous steps until you reach the goal node
-    pub fn _run_search(self) -> Vec<Node> {
-        vec![]
+    pub fn run_search(&mut self) -> Option<Vec<u8>> {
+        while self.frontier_set.len() > 0 {
+            let mut current_node = self.frontier_heap.pop().unwrap().0;
+            println!(
+                "current => {}, f_score => {}",
+                current_node.1.node, current_node.1.f_score
+            );
+            if current_node.1.node == self.goal {
+                current_node.1.actions.reverse();
+                current_node.1.actions.push(self.goal);
+                return Some(current_node.1.actions);
+            } else {
+                self.explored_set.insert(current_node.1.node);
+                self.frontier_set.remove(&current_node.1.node);
+            }
+
+            println!("================================CONNECTIONS===========================");
+            for conn in current_node.1.connections {
+                if self.explored_set.contains(&conn) {
+                    // node already explored, skip
+                    continue;
+                }
+
+                if !self.frontier_set.contains(&conn) {
+                    // new path discovered
+                    // update frontier with new paths
+                    let mut came_from = vec![current_node.1.node];
+                    came_from.extend(current_node.1.actions.iter());
+                    self.update_frontier(current_node.1.node, conn, came_from);
+                }
+            }
+            println!("================================END===========================");
+        }
+        println!("no path found!");
+        None
+    }
+
+    fn update_frontier(&mut self, current: u8, neighbor: u8, mut came_from: Vec<u8>) {
+        let mut connection = self.map.get(&neighbor).cloned().unwrap();
+        connection.actions.append(&mut came_from);
+        connection.f_score =
+            self.euclidean_distance(current, neighbor) + self.calculate_fscore(current, neighbor);
+        println!(
+            "f_Score => {}, node => {}",
+            connection.f_score, connection.node
+        );
+
+        self.frontier_set.insert(connection.node);
+        self.frontier_heap
+            .push(Reverse(FrontierNode(connection.f_score, connection)));
+    }
+
+    pub fn set_map(&mut self, m: Map) {
+        let mut nodes = HashMap::new();
+        for loc in m.iter() {
+            nodes.insert(
+                *loc.0,
+                Node::new(*loc.0, loc.1 .0.clone(), loc.1 .1.clone()),
+            );
+        }
+        self.map = nodes
+    }
+
+    pub fn set_goal(&mut self, goal: u8) {
+        self.goal = goal
+    }
+
+    pub fn set_start(&mut self, start: u8) {
+        self.start = start
+    }
+
+    // Computes the Euclidean L2 Distance
+    pub fn euclidean_distance(&self, node_1: u8, node_2: u8) -> f64 {
+        // TODO add error handling
+        let n = self.map.get(&node_1).unwrap();
+        let n1 = self.map.get(&node_2).unwrap();
+        (n1.x() - n.x()).powf(2.0) + (n1.y() - n.y()).powf(2.0)
+    }
+
+    // pub fn _manhattan_distance(&self, node_1: u8, node_2: u8) -> f64 {
+    //     0.0
+    // }
+
+    // straight distance between the start node and goal must be less than actual distance by road
+    // hence straight line distance is an admissible heuristic
+    fn heuristic_cost_estimate(&self, node: u8) -> f64 {
+        self.euclidean_distance(node, self.goal)
+    }
+
+    fn calculate_fscore(&self, node_1: u8, node_2: u8) -> f64 {
+        // TODO add error handling
+        self.euclidean_distance(node_1, node_2) + self.heuristic_cost_estimate(node_2)
     }
 }

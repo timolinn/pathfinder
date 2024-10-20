@@ -2,7 +2,7 @@ use std::{collections::HashMap, vec};
 
 use once_cell::sync::Lazy;
 
-pub static MAP: Lazy<HashMap<u8, (Position, Vec<u8>)>> = Lazy::new(|| {
+pub static LAZY_MAP: Lazy<HashMap<u8, (Position, Vec<u8>)>> = Lazy::new(|| {
     let cities_tuples = vec![
         (
             0,
@@ -285,9 +285,12 @@ pub static MAP: Lazy<HashMap<u8, (Position, Vec<u8>)>> = Lazy::new(|| {
             ),
         ),
     ];
-    cities_tuples.into_iter().collect()
+    let res = cities_tuples.into_iter().collect();
+    res
 });
 
 // x and y coordinates
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Position(pub f64, pub f64);
+
+pub type Map = HashMap<u8, (Position, Vec<u8>)>;

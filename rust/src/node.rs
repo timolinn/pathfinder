@@ -13,6 +13,7 @@ pub struct Node {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// (prev node, g_score, current_node)
 pub struct FrontierNode(pub u8, pub f64, pub Node);
 
 impl Node {

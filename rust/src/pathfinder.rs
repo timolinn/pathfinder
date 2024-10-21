@@ -21,11 +21,8 @@ impl Pathfinder {
     pub fn new(map: Map, start: u8, goal: u8) -> Self {
         // transform Map to nodes
         let mut nodes = HashMap::new();
-        for loc in map.iter() {
-            nodes.insert(
-                *loc.0,
-                Node::new(*loc.0, loc.1 .0.clone(), loc.1 .1.clone()),
-            );
+        for loc in map {
+            nodes.insert(loc.0, Node::new(loc.0, loc.1 .0.clone(), loc.1 .1.clone()));
         }
 
         let start_node = nodes.get(&start).cloned().unwrap();
@@ -41,22 +38,12 @@ impl Pathfinder {
             FrontierNode(0, pathfinder.heuristic_cost_estimate(start), start_node);
         start_f_node.2.g_score = 0.0;
 
-        // initialize frontier min-heap for efficient selection of lowest cost path
+        // initialize frontier min-heap
         pathfinder.frontier_heap = BinaryHeap::from([Reverse(start_f_node)]);
 
         pathfinder
     }
 
-    // take the start item, add it to the frontier
-    // take it out from the frontier and expand the paths
-    // add the paths to the frontier
-    // add the start to the explored
-    // take the best item out of the frontier
-    // expand the paths
-    // add the paths to the frontier
-    // add the best item to explored list
-    // take best item again
-    // repeat previous steps until you reach the goal node
     pub fn run_search(&mut self) -> Option<Vec<u8>> {
         while self.frontier_set.len() > 0 {
             let lowest_cost_node = self.frontier_heap.pop().unwrap().0;
@@ -107,11 +94,8 @@ impl Pathfinder {
 
     pub fn set_map(&mut self, m: Map) {
         let mut nodes = HashMap::new();
-        for loc in m.iter() {
-            nodes.insert(
-                *loc.0,
-                Node::new(*loc.0, loc.1 .0.clone(), loc.1 .1.clone()),
-            );
+        for loc in m {
+            nodes.insert(loc.0, Node::new(loc.0, loc.1 .0.clone(), loc.1 .1.clone()));
         }
         self.map = nodes
     }

@@ -1,3 +1,3 @@
 # Pathfinder
 
-A star algorithm implemented in Python and Rust.
+A star algorithm implemented in Rust and Python.

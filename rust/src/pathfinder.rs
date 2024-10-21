@@ -19,6 +19,7 @@ pub struct Pathfinder {
 
 impl Pathfinder {
     pub fn new(map: Map, start: u8, goal: u8) -> Self {
+        // transform Map to nodes
         let mut nodes = HashMap::new();
         for loc in map.iter() {
             nodes.insert(
@@ -27,16 +28,23 @@ impl Pathfinder {
             );
         }
 
-        let mut start_node = FrontierNode(0, 0.0, nodes.get(&start).cloned().unwrap());
-        start_node.2.g_score = 0.0;
-        Self {
-            map: nodes,
-            start,
-            goal,
-            explored_set: HashSet::new(),
-            frontier_heap: BinaryHeap::from([Reverse(start_node)]),
-            frontier_set: HashSet::from([(start, start)]),
-        }
+        let start_node = nodes.get(&start).cloned().unwrap();
+
+        let mut pathfinder = Self::default();
+        pathfinder.map = nodes;
+        pathfinder.start = start;
+        pathfinder.goal = goal;
+        pathfinder.explored_set = HashSet::new();
+        pathfinder.frontier_set = HashSet::from([(start, start)]);
+
+        let mut start_f_node =
+            FrontierNode(0, pathfinder.heuristic_cost_estimate(start), start_node);
+        start_f_node.2.g_score = 0.0;
+
+        // initialize frontier min-heap for efficient selection of lowest cost path
+        pathfinder.frontier_heap = BinaryHeap::from([Reverse(start_f_node)]);
+
+        pathfinder
     }
 
     // take the start item, add it to the frontier
@@ -51,35 +59,31 @@ impl Pathfinder {
     // repeat previous steps until you reach the goal node
     pub fn run_search(&mut self) -> Option<Vec<u8>> {
         while self.frontier_set.len() > 0 {
-            let mut current_node = self.frontier_heap.pop().unwrap().0;
+            let lowest_cost_node = self.frontier_heap.pop().unwrap().0;
+            let mut current_node = lowest_cost_node.2;
 
-            if current_node.2.node == self.goal {
-                current_node.2.actions.reverse();
-                current_node.2.actions.push(self.goal);
-                return Some(current_node.2.actions);
+            if current_node.node == self.goal {
+                current_node.actions.reverse();
+                current_node.actions.push(self.goal);
+                return Some(current_node.actions);
             } else {
-                self.explored_set.insert(current_node.2.node);
+                self.explored_set.insert(current_node.node);
                 self.frontier_set
-                    .remove(&(current_node.0, current_node.2.node));
+                    .remove(&(lowest_cost_node.0, current_node.node));
             }
 
-            for conn in current_node.2.connections {
+            for conn in current_node.connections {
                 if self.explored_set.contains(&conn) {
                     // node already explored, skip
                     continue;
                 }
 
-                if !self.frontier_set.contains(&(current_node.2.node, conn)) {
+                if !self.frontier_set.contains(&(current_node.node, conn)) {
                     // new path discovered
                     // update frontier with new paths
-                    let mut came_from = vec![current_node.2.node];
-                    came_from.extend(current_node.2.actions.iter());
-                    self.update_frontier(
-                        current_node.2.node,
-                        conn,
-                        came_from,
-                        current_node.2.g_score,
-                    );
+                    let mut came_from = vec![current_node.node];
+                    came_from.extend(current_node.actions.iter());
+                    self.update_frontier(current_node.node, conn, came_from, current_node.g_score);
                 }
             }
         }
@@ -90,8 +94,9 @@ impl Pathfinder {
     fn update_frontier(&mut self, current: u8, neighbor: u8, mut came_from: Vec<u8>, g_score: f64) {
         let mut connection = self.map.get(&neighbor).cloned().unwrap();
         connection.actions.append(&mut came_from);
-        connection.g_score = g_score + self.euclidean_distance(current, neighbor);
+        connection.g_score = g_score + self.euclidean_distance(current, neighbor); // add g_score so far (tentative g_score of the path)
         connection.f_score = self.calculate_fscore(&connection);
+
         self.frontier_set.insert((current, connection.node));
         self.frontier_heap.push(Reverse(FrontierNode(
             current,
@@ -119,7 +124,7 @@ impl Pathfinder {
         self.start = start
     }
 
-    // Computes the Euclidean L2 Distance
+    /// Computes the Euclidean L2 Distance
     pub fn euclidean_distance(&self, node_1: u8, node_2: u8) -> f64 {
         // TODO add error handling
         let n = self.map.get(&node_1).unwrap();
@@ -131,13 +136,29 @@ impl Pathfinder {
     //     0.0
     // }
 
-    // straight distance between the start node and goal must be less than actual distance by road
-    // hence straight line distance is an admissible heuristic
+    /// straight distance between the start node and goal must be less than actual distance by road
+    /// hence straight line distance is an admissible heuristic
     fn heuristic_cost_estimate(&self, node: u8) -> f64 {
         self.euclidean_distance(node, self.goal)
     }
 
+    /// f = g + h
+    /// g = actual cost of path
+    /// h = admissible heuristic cost emtimate from start -> goal
     fn calculate_fscore(&self, node: &Node) -> f64 {
         node.g_score + self.heuristic_cost_estimate(node.node)
+    }
+}
+
+impl Default for Pathfinder {
+    fn default() -> Self {
+        Self {
+            map: HashMap::default(),
+            explored_set: HashSet::default(),
+            frontier_heap: BinaryHeap::default(),
+            frontier_set: HashSet::default(),
+            start: u8::default(),
+            goal: u8::default(),
+        }
     }
 }
